@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /cache/
+Disallow: /ckeditor/
+Disallow: /css/
+Disallow: /js/
+Disallow: /min/
+Disallow: /src/

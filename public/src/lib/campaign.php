@@ -17,7 +17,6 @@ class Campaign implements iTethysBase,Schedulable {
 	public function __construct() {}
 	public static function search() {}
 	public static function getById() {}
-	public static function getById() {}
 	public function __get() {}
 	public function __set() {}
 	public static function add() {}

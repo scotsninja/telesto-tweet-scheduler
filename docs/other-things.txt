@@ -1,0 +1,6 @@
+privacy policy
+  what information is stored/tracked
+terms of use
+application/rate_limit_status - for alerting if approaching rate limit
+statuses/update_with_media - upload images with posts
+store returned id and returned obj in tweet history

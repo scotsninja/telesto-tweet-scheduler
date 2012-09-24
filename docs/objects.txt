@@ -1,0 +1,65 @@
+authorization:
+	user clicks sign in
+		signed in -
+			user grants access
+		not signed in -
+			user signs in and grants access
+	collect oAuth token
+	
+objects:
+	User
+	Campaign
+	CampaignSource
+	Tweet (a)
+	StoredTweet (ex:Tweet, i:Schedulable)
+	PostedTweet (ex:Tweet, i:Schedulable)
+	Schedulable (i)
+
+user:
+	id
+	email
+	twitter id
+	twitter name
+	date authorized
+	access key
+	active
+	lat		(user's default lat)
+	long	(users's default long)
+
+tweet:
+	id
+	uid
+	user
+	twitter id
+	date
+	status
+	link
+	lat
+	long
+
+stored tweet:
+	sent
+
+posted tweet:
+	stored tweet id
+	twitter response
+	
+campaign:
+	id
+	UID
+	user
+	name
+	description
+	type: ordered, random
+	status: active,archived,hidden
+	date created
+	date start
+	date end
+
+campaign source:
+	id
+	type: external, stored tweet
+	order
+	stored tweet id
+	url
+	params

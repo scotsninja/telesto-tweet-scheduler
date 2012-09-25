@@ -10,11 +10,6 @@
 
 $btStart = microtime(true);
 
-// for dev version (remove on production sites)
-if (preg_match('/^localhost/i', $_SERVER['SERVER_NAME'])) {
-	ini_set('include_path', '.;C:\xampp\php\PEAR;C:\xampp\lib;C:\Users\scotsninja\git\20xx-Productions-Website\src\htdocs\src\lib');
-}
-
 // create output buffer
 ob_start('ob_gzhandler');
 

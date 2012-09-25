@@ -11,7 +11,9 @@ class User {
 	private $defaultLat;
 	private $defaultLong;
 	private $dateAuthorized;
-	private $active;	
+	private $active;
+	
+	private $authToken;
 	
 	/* METHODS */
 	
@@ -24,6 +26,8 @@ class User {
 		$this->defaultLong = $defaultLong;
 		$this->dateAuthorized = $dateAuthorized;
 		$this->active = $active;
+		
+		$this->authToken = $this->getAuthToken();
 	}
 	
 	/* SEARCH */
@@ -110,63 +114,47 @@ class User {
 		return (isset($this->$var)) ? $this->$var : parent::__get($var);
 	}
 	
-	public function __set($var, $value) {
-		return false;
-	}
-	
 	// creates a new user account
 	// only admins can use this function; use User::register() when creating new accounts for active users
-	public static function add($email, $passwd = null, $cpasswd = null, $level = 'client', $active = 1, $name = null, $company = null, $title = null) {
-		// check that the active user is logged in and an admin
-		if (!User::isAdmin()) {
-			throw new Exception ('You do not have permission to add user accounts');
-		}
-		
+	public static function register($email, $tId, $tName, $accessKey = null) {
 		// validate the account information
 		if (!isValidEmail($email)) {
-			throw new Exception('Username must be a valid email address');
+			//throw new Exception('Username must be a valid email address');
+			SystemMessage::save(MSG_WARNING, 'Invalid email address');
+			$fail[] = true;
 		}
-		if (!isUsernameAvailable($email)) {
-			throw new Exception('The selected username is not available');
+		if ($tId == '') {
+			$fail[] = true;
 		}
-		if (!isValidPassword($passwd)) {
-			throw new Exception('Invalid password');
+		if ($tName == '') {
+			$fail[] = true;
 		}
-		if ($passwd != $cpasswd) {
-			throw new Exception('Passwords do not match');
+		
+		if (CORE_REQUIRE_ACCESS_KEY) {
+			if (!isValidAccessKey($accessKey)) {
+				SystemMessage::save(MSG_WARNING, 'Access key not valid');
+				$fail[] = true;
+			}
 		}
-
-		$ePassword = encryptPassword($passwd, $userSalt);
-		$active = ((int)$active === 1) ? 1 : 0;
+		
+		if (is_array($fail) && in_array(true, $fail)) {
+			return false;
+		}
 		
 		// insert user info into db
-		$query = "INSERT INTO `users` (`userEmail`, `userPassword`, `userSalt`, `userLevel`, `userActive`) VALUES (:email, :password, :salt, :level, :active)";
-		
+		$query = "INSERT INTO `users` (`userEmail`, `userTwitterId`, `userTwitterName`, `userDateAuthorized`, `userActive`) VALUES (:email, :tid, :tname, :date, :active)";
+
 		$params = array(
 			'email' => $email,
-			'password' => $ePassword,
-			'salt' => $userSalt,
-			'level' => $level,
-			'active' => $active
+			'tid' => $tId,
+			'name' => $tName,
+			'date' => $GLOBALS['dtObj']->format('now',DATE_SQL_FORMAT),
+			'active' => 1
 		);
 
 		try {
-			$GLOBALS['dbObj']->beginTransaction();
-			
-			$userId = $GLOBALS['dbObj']->insert($query, $params);
-			
-			if ($userId > 0) {
-				// create user profile
-				if (Person::add($name, $userId, $company, $title)) {
-					$GLOBALS['dbObj']->commit();
-					return $userId;
-				}
-			}
-
-			$GLOBALS['dbObj']->rollBack();
-			return false;
+			return $GLOBALS['dbObj']->insert($query, $params);
 		} catch(Exception $e) {
-			$GLOBALS['dbObj']->rollBack();
 			throw new Exception($e->getMessage());
 		}
 	}
@@ -254,70 +242,40 @@ class User {
 		}
 	}
 	
-	// loads user info associated to username, and verifies password
-	// sets userId in session and returns true if verified
-	// otherwise, returns false
-	public static function login($uname, $password) {
-		// validate passed info
-		if ($uname == '') {
-			User::recordLogin($uname, null, 'failure');
-			throw new Exception('Enter your username');
-		}
-		if ($password == '') {
-			User::recordLogin($uname, null, 'failure');
-			throw new Exception('Enter your password');
+	public static function login($twitterId) {
+		if (!is_numeric($twitterId) || $twitterId < 1) {
+			return false;
 		}
 		
-		// retrieve user account matching username
 		$query = "SELECT `userId` AS id, ".
 				"`userEmail` AS email, ".
-				"`userPassword` AS password, ".
-				"`userSalt` AS salt, ".
-				"`userLevel` AS level, ".
+				"`userTwitterId` AS tid, ".
+				"`userTwitterName` AS tname, ".
+				"`userDefaultLat` AS lat, ".
+				"`userDefaultLong` AS long, ".
+				"`userDateAuthorized` AS da, ".
 				"`userActive` AS active ".
-				"FROM `users` WHERE `userEmail`=:uname AND `userActive`=1";
-
-		$params = array('uname' => $uname);
-
-		// execute the query
-		$row = $GLOBALS['dbObj']->select($query, $params);
+				"FROM `users` WHERE `userTwitterId`=:tid";
+		$params = array('tid' => $twitterId);
 		
-		if (!$row) {
-			User::recordLogin($uname, null, 'failure');
-			throw new Exception('Username or password do not match records.');
+		try {
+			$results = $GLOBALS['dbObj']->select($query, $params);
+			
+			if (!$results) {
+				throw new Exception('No results returned');
+			}
+			
+			$obj = $results[0];
+			$tempUser = new User($obj['id'], $obj['email'], $obj['tid'], $obj['tname'], $obj['lat'], $obj['long'], $obj['da'], $obj['active']);
+			
+			$_SESSION['userId'] = $tempUser->id;
+			
+			User::recordLogin($tempUser->email, $tempUser->id, 'success');
+			
+			return true;
+		} catch (Exception $e) {
+			return false;
 		}
-		
-		$obj = $row[0];
-		
-		$tempUser = new User($obj['id'], $obj['email'], $obj['level'], $obj['salt'], $obj['active']);
-
-		// verify password
-		if ($obj['password'] != encryptPassword($password, $obj['salt'])) {
-			User::recordLogin($uname, $tempUser->id, 'failure');
-			unset($tempUser);
-			throw new Exception('Username or password do not match records.');
-		}
-		
-		// set session variable
-		$_SESSION['userId'] = $tempUser->id;
-
-		// record successful login
-		User::recordLogin($uname, $tempUser->id, 'success');
-		session_regenerate_id(true);
-
-		return true;
-	}
-	
-	// log user out
-	// unsets userId in session and userObj
-	public static function logout() {
-		if (User::isLoggedIn()) {
-			User::recordLogin($GLOBALS['userObj']->email, $GLOBALS['userObj']->id, 'logout');
-			clearSession();
-			unset($GLOBALS['userObj']);
-		}
-		
-		return true;
 	}
 	
 	/* PERMISSIONS */
@@ -344,7 +302,22 @@ class User {
 		return $ret;
 	}
 	
+	private function getAuthToken() {
+		$query = "SELECT `uaAuthToken` AS result FROM `user_activity` WHERE `uaUserId`=:id AND `uaAction`=:action".addQuerySort('uaDate DESC').addQueryLimit(1);
+		$params = array('id' => $this->id, 'action' => 'success');
+	
+		return $GLOBALS['dbObj']->fetchResult($query, $params);
+	}
+	
 	/* UTILITIES */
+	
+	public static function getNameById($id) {
+		return null;
+	}
+	
+	public static function getList($sort = 'userEmail', $showInactive = false) {
+		return null;
+	}
 	
 	// returns true if the active user is logged in
 	public static function isLoggedIn() {

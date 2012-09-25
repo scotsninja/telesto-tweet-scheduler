@@ -1,0 +1,1 @@
+registration process:- collect email and access key	verify access key- provide link to authorize twitter app	follow twitter dialogslogin process:- if not logged in to twitter	provide link to log in and authorize via twitter- if logged in to twitter but not authorized	provide link to authorize- if logged in to twitter and authorized	load user object into session

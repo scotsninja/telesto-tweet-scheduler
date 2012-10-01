@@ -29,9 +29,12 @@ class Campaign implements iTethysBase,Schedulable {
 	public function setType() {}
 	public function canEdit() {}
 	
-	public function addSource() {}
-	public function removeSource() {}
-	
+	public function addList() {}
+	public function removeList() {}
+	public function addUrl() {}
+	public function removeUrl() {}
+	private function addSource() {}
+	private function removeSource() {}
 	
 	public static function getList() {}
 	public static function getNameById() {}
